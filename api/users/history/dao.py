@@ -12,18 +12,19 @@ from datetime import datetime, date
 class UserHistoryDAO(BaseDAO):
     model = UserHistory
 
-
-
     @classmethod
     async def get_used_requests_today(cls, user_id: int):
         async with async_session_maker() as session:
             async with session.begin():
-                # Query for counting rows with today's date and unique start_point address
-                stmt = select(func.count(UserHistory.id)).where(
+                stmt = select(UserHistory.request).where(
                     UserHistory.user_id == user_id,
-                    func.date(UserHistory.created_at) == date.today(),
-                    UserHistory.request['start_point']['address'].isnot(None)  # Ensure address exists
-                ).group_by(UserHistory.request['start_point']['full_address'])
+                    func.date(UserHistory.created_at) == date.today()
+                )
                 
                 result = await session.execute(stmt)
-                return result.scalar() or 0
+                #TODO fix this; use sqlalchemy tools
+                addresses = set()
+                for address in result:
+                    addresses.add(address.request.get("start_point", {}).get("address").get("full_address"))
+                    
+                return len(addresses)
