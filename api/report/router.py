@@ -126,7 +126,7 @@ async def generate_report_geojson(
         pass
 
 
-    res = generate_report.delay(user.id,nearest_pois_dict)
+    res = generate_report(user.id,nearest_pois_dict)
 
     return res.id
 
@@ -176,8 +176,8 @@ async def get_task_result(
             return JSONResponse(content=geojson_data)
         elif accept_header == "application/json":
             json_ = response_data.get("result", {}).get("full", {})
-            json_["shareData"] = response_data.get("shareData")
-            json_["signature"] = response_data.get("signature")
+            json_["shareData"] = response_data.get("result", {}).get("shareData")
+            json_["signature"] = response_data.get("result", {}).get("signature")
             return JSONResponse(content=json_)
         elif accept_header == "application/json+geojson":
             return JSONResponse(content=response_data)
