@@ -96,6 +96,7 @@ pure_eval==0.2.3
 pwdlib==0.2.0
 pycares==4.4.0
 pycparser==2.22
+pycryptodome==3.21.0
 pydantic==2.8.2
 pydantic-extra-types==2.9.0
 pydantic-settings==2.3.4
@@ -121,6 +122,7 @@ redis==5.0.8
 requests==2.32.3
 rich==13.7.1
 sentry-sdk==2.12.0
+setuptools==75.2.0
 shapely==2.0.5
 shellingham==1.5.4
 six==1.16.0
