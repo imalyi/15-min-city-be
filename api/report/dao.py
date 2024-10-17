@@ -15,6 +15,7 @@ from api.pois.dao import POIDAO
 from api.exceptions import NotFoundException
 
 
+
 class ReportDAO:
 
     @classmethod

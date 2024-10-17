@@ -1,11 +1,38 @@
+from operator import add
+from api.dao import base
 import openrouteservice as ors
 from celery import shared_task
 from geojson import Feature, FeatureCollection, Point
 import googlemaps
 import datetime
-
+import zlib
+import base64
 from api.config import config
 
+from hashlib import sha256
+from api.config import config
+import hmac
+import hashlib
+import base64
+import datetime
+
+def generate_sharable_token(user_id, request):
+    address_id = request.get("address_id")
+    categories_ids = " ".join(map(lambda id_:str(id_), request.get("category_ids", [])))
+    custom_address_ids = " ".join(map(lambda id_:str(id_), request.get("custom_address_ids", [])))
+    custom_places_ids = " ".join(map(lambda id_:str(id_), request.get("custom_places_ids", [])))
+    # fist digit is version
+    result = f"1\n{user_id}\n{address_id}\n{categories_ids}\n{custom_address_ids}\n{custom_places_ids}\n{int(datetime.datetime.now().timestamp())}"
+    signature = hmac.new(config.JWT_SECRET.encode(), result.encode(), hashlib.sha256).digest()
+
+    result_compressed = zlib.compress(result.encode("ascii"))
+    
+    url_safe_signature = base64.urlsafe_b64encode(signature).decode()
+    result_compressed_url_safe = base64.urlsafe_b64encode(result_compressed).decode()
+
+    return result_compressed_url_safe, url_safe_signature
+
+ 
 
 def calc_distance_between_coordinates(from_, to):
     client = ors.Client(key="", base_url=config.ORS_URL)
@@ -78,7 +105,7 @@ def calc_distance_for_all(from_, nearest_pois: dict, key: str):
 
 
 @shared_task
-def generate_report(nearest_pois: dict):
+def generate_report(user_id, nearest_pois: dict):
     from_ = [
         nearest_pois.get("start_point", {}).get("location").get("lon"),
         nearest_pois.get("start_point", {}).get("location").get("lat"),
@@ -90,7 +117,8 @@ def generate_report(nearest_pois: dict):
         nearest_pois.get("start_point").get("address").get("full_address"),
         nearest_pois.get("custom_addressess"),
     )
-    return {"full": nearest_pois, "geojson": generate_geojson(nearest_pois)}
+    data, signature = generate_sharable_token(user_id, nearest_pois.get("request"))
+    return {"full": nearest_pois, "geojson": generate_geojson(nearest_pois), "shareData": data, "signature": signature}
 
 
 def calc_time_for_custom_addressess(

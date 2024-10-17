@@ -1,8 +1,7 @@
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
-from kombu.exceptions import HttpError
-
+from fastapi import HTTPException
 from api.category_collections.categories.router import get_category_by_id
 from api.report.dao import ReportDAO
 from api.report.schemas import ReportCreate
@@ -12,9 +11,41 @@ from api.users.user_manager import current_user_optional, current_active_user
 from api.users.history.router import create_history_record
 from api.exceptions import DuplicateEntryException, NotFoundException
 from api.users.limits.router import get_user_limits
+from api.users.dao import UserDAO
+from hashlib import sha256
+from api.config import config
+import hmac
+import hashlib
+import base64
+import datetime
+import zlib
 
 
 router = APIRouter(prefix="/report", tags=["Report"])
+
+def decode_sharable_token(sharable_token, sign_token):
+    sign_token = base64.urlsafe_b64decode(sign_token)
+    sharable_token = zlib.decompress(base64.urlsafe_b64decode(sharable_token)).decode()
+    signature = hmac.new(config.JWT_SECRET.encode(), sharable_token.encode(), hashlib.sha256).digest()
+    if signature != sign_token:
+        raise ValueError("Invalid token")
+    version = sharable_token.split("\n")[0]
+    user_id = sharable_token.split("\n")[1]
+    address_id = sharable_token.split("\n")[2]
+    category_ids = sharable_token.split("\n")[3].split(" ")
+    custom_address_ids = sharable_token.split("\n")[4].split(" ")
+    custom_places_ids = sharable_token.split("\n")[5].split(" ")
+    timestamp = sharable_token.split("\n")[6]
+    return {
+        "user_id": user_id,
+        "address_id": address_id,
+        "category_ids": category_ids,
+        "custom_address_ids": custom_address_ids,
+        "custom_places_ids": custom_places_ids,
+        "timestamp": timestamp,
+    }
+    
+
 
 
 async def is_user_have_requests(user):
@@ -64,7 +95,7 @@ async def check_user_permission_on_report(
     return True
 
 
-@router.post("/", status_code=202, response_model=str)
+@router.post("/", status_code=202, )
 async def generate_report_geojson(
     report_request: ReportCreate,
     user: User = Depends(current_active_user),
@@ -94,9 +125,23 @@ async def generate_report_geojson(
     except DuplicateEntryException:
         pass
 
-    res = generate_report.delay(nearest_pois_dict)
+
+    res = generate_report.delay(user.id,nearest_pois_dict)
+
     return res.id
 
+
+
+
+@router.get("/sharing")
+async def get_task_id_by_sharable_data(sharable_data, signature, user: User = Depends(current_user_optional)):
+    try:
+        data = decode_sharable_token(sharable_data, signature)
+    except ValueError:
+        raise HTTPException(404, "Data was modified")
+    user = await UserDAO.find_by_id(int(data["user_id"]))
+    task_id = await generate_report_geojson(ReportCreate.validate(data), user)
+    return task_id
 
 @router.get("/{task_id}", status_code=200)
 async def get_task_result(
@@ -131,6 +176,8 @@ async def get_task_result(
             return JSONResponse(content=geojson_data)
         elif accept_header == "application/json":
             json_ = response_data.get("result", {}).get("full", {})
+            json_["shareData"] = response_data.get("shareData")
+            json_["signature"] = response_data.get("signature")
             return JSONResponse(content=json_)
         elif accept_header == "application/json+geojson":
             return JSONResponse(content=response_data)
