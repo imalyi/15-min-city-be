@@ -19,6 +19,7 @@ import hashlib
 import base64
 import datetime
 import zlib
+import json
 
 class ModifiedDataException(Exception):
     pass
@@ -35,24 +36,7 @@ def decode_sharable_token(sharable_token, sign_token):
     print("data", sharable_token)
     if signature != sign_token:
         raise ModifiedDataException("Invalid token")
-    version = sharable_token.split("\n")[0]
-    user_id = sharable_token.split("\n")[1]
-    address_id = sharable_token.split("\n")[2]
-    category_ids = sharable_token.split("\n")[3].split(" ")
-    custom_address_ids = sharable_token.split("\n")[4].split(" ")
-    custom_places_ids = sharable_token.split("\n")[5].split(" ")
-    timestamp = sharable_token.split("\n")[6]
-    def safe_convert_to_int(ids):
-        return list(map(lambda id_: int(id_), filter(lambda x: x != '', ids)))
-
-    return {
-        "user_id": int(user_id),
-        "address_id": int(address_id),
-        "category_ids": safe_convert_to_int(category_ids),
-        "custom_address_ids": safe_convert_to_int(custom_address_ids),
-        "custom_places_ids": safe_convert_to_int(custom_places_ids),
-        "timestamp": int(timestamp),
-    }
+    return json.loads(sharable_token)
     
     
 

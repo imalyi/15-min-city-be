@@ -15,17 +15,16 @@ import hmac
 import hashlib
 import base64
 import datetime
+import json
 
 def generate_sharable_token(user_id, request):
-    address_id = request.get("address_id")
-    categories_ids = " ".join(map(lambda id_:str(id_), request.get("category_ids", [])))
-    custom_address_ids = " ".join(map(lambda id_:str(id_), request.get("custom_address_ids", [])))
-    custom_places_ids = " ".join(map(lambda id_:str(id_), request.get("custom_places_ids", [])))
-    # fist digit is version
-    result = f"1\n{user_id}\n{address_id},{categories_ids}\n{custom_address_ids}\n{custom_places_ids}\n{int(datetime.datetime.now().timestamp())}"
-    signature = hmac.new(config.JWT_SECRET.encode(), result.encode(), hashlib.sha256).digest()
+    request["version"] = 1
+    request["genearated"] = datetime.datetime.now().timestamp()
+    request["user_id"] = user_id
+    json_request = json.dumps(request, sort_keys=True)
+    signature = hmac.new(config.JWT_SECRET.encode(), json_request.encode(), hashlib.sha256).digest()
 
-    result_compressed = zlib.compress(result.encode("ascii"))
+    result_compressed = zlib.compress(json_request.encode("ascii"))
     
     url_safe_signature = base64.urlsafe_b64encode(signature).decode()
     result_compressed_url_safe = base64.urlsafe_b64encode(result_compressed).decode()
