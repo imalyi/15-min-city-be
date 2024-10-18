@@ -109,10 +109,7 @@ async def generate_report_geojson(
             raise HTTPException(404, "Some categories not found")
         if not is_user_have_permission_for_categories:
             raise HTTPException(403, "User dont have permission on category")
-        try:
-            await create_history_record(user, nearest_pois_dict)
-        except DuplicateEntryException:
-            pass
+
 
     try:
         nearest_pois_dict = await ReportDAO.generate_report_create_for_celery(
@@ -120,10 +117,13 @@ async def generate_report_geojson(
         )
     except NotFoundException:
         raise HTTPException(404, "Adress or category not found")
-
+ 
     if not user:
         user = await UserDAO.find_by_id(10)
-
+    try:
+        await create_history_record(user, nearest_pois_dict)
+    except DuplicateEntryException:
+        pass
     res = generate_report.delay(user.id,nearest_pois_dict)
 
     return res.id
