@@ -126,7 +126,7 @@ async def generate_report_geojson(
         pass
 
 
-    res = generate_report(user.id,nearest_pois_dict)
+    res = generate_report.delay(user.id,nearest_pois_dict)
 
     return res.id
 
