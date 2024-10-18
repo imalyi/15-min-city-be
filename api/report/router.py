@@ -31,7 +31,7 @@ def decode_sharable_token(sharable_token, sign_token):
     sharable_token = zlib.decompress(base64.urlsafe_b64decode(sharable_token)).decode()
     signature = hmac.new(config.JWT_SECRET.encode(), sharable_token.encode(), hashlib.sha256).digest()
     print("Decoding")
-    print("original signature", sign_token)
+    print("original   signature", sign_token)
     print("calculated signature", signature)
     print("data", sharable_token)
     if signature != sign_token:
@@ -92,33 +92,37 @@ async def check_user_permission_on_report(
 @router.post("/", status_code=202, )
 async def generate_report_geojson(
     report_request: ReportCreate,
-    user: User = Depends(current_active_user),
+    user: User = Depends(current_user_optional),
 ):
-    if not await is_user_have_requests(user):
-        raise HTTPException(403, "User exceed daily limit")
-    if not await check_user_permission_on_report(user, report_request):
-        raise HTTPException(403, "User dont have permission")
-    try:
-        is_user_have_permission_for_categories = (
-            await check_is_user_have_permissions_for_categories(
-                user, report_request
+    if user:
+        if not await is_user_have_requests(user):
+            raise HTTPException(403, "User exceed daily limit")
+        if not await check_user_permission_on_report(user, report_request):
+            raise HTTPException(403, "User dont have permission")
+        try:
+            is_user_have_permission_for_categories = (
+                await check_is_user_have_permissions_for_categories(
+                    user, report_request
+                )
             )
-        )
-    except NotFoundException:
-        raise HTTPException(404, "Some categories not found")
-    if not is_user_have_permission_for_categories:
-        raise HTTPException(403, "User dont have permission on category")
+        except NotFoundException:
+            raise HTTPException(404, "Some categories not found")
+        if not is_user_have_permission_for_categories:
+            raise HTTPException(403, "User dont have permission on category")
+        try:
+            await create_history_record(user, nearest_pois_dict)
+        except DuplicateEntryException:
+            pass
+
     try:
         nearest_pois_dict = await ReportDAO.generate_report_create_for_celery(
             report_request
         )
     except NotFoundException:
         raise HTTPException(404, "Adress or category not found")
-    try:
-        await create_history_record(user, nearest_pois_dict)
-    except DuplicateEntryException:
-        pass
 
+    if not user:
+        user = await UserDAO.find_by_id(10)
 
     res = generate_report.delay(user.id,nearest_pois_dict)
 

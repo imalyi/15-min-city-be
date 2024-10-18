@@ -19,7 +19,7 @@ import json
 
 def generate_sharable_token(user_id, request):
     request["version"] = 1
-    request["genearated"] = datetime.datetime.now().timestamp()
+    request["generated"] = datetime.datetime.now().timestamp()
     request["user_id"] = user_id
     json_request = json.dumps(request, sort_keys=True)
     signature = hmac.new(config.JWT_SECRET.encode(), json_request.encode(), hashlib.sha256).digest()
