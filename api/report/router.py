@@ -37,13 +37,14 @@ def decode_sharable_token(sharable_token, sign_token):
     custom_places_ids = sharable_token.split("\n")[5].split(" ")
     timestamp = sharable_token.split("\n")[6]
     return {
-        "user_id": user_id,
-        "address_id": address_id,
-        "category_ids": category_ids,
-        "custom_address_ids": custom_address_ids,
-        "custom_places_ids": custom_places_ids,
-        "timestamp": timestamp,
+        "user_id": int(user_id),
+        "address_id": int(address_id),
+        "category_ids": list(map(lambda id_: int(id_), category_ids)),
+        "custom_address_ids": list(map(lambda id_: int(id_), custom_address_ids)),
+        "custom_places_ids": list(map(lambda id_: int(id_), custom_places_ids)),
+        "timestamp": int(timestamp),
     }
+    
     
 
 
