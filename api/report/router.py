@@ -20,15 +20,21 @@ import base64
 import datetime
 import zlib
 
+class ModifiedDataException(Exception):
+    pass
 
 router = APIRouter(prefix="/report", tags=["Report"])
 
 def decode_sharable_token(sharable_token, sign_token):
-    sign_token = base64.urlsafe_b64decode(sign_token).decode()
+    sign_token = base64.urlsafe_b64decode(sign_token)
     sharable_token = zlib.decompress(base64.urlsafe_b64decode(sharable_token)).decode()
     signature = hmac.new(config.JWT_SECRET.encode(), sharable_token.encode(), hashlib.sha256).digest()
+    print("Decoding")
+    print("original signature", sign_token)
+    print("calculated signature", signature)
+    print("data", sharable_token)
     if signature != sign_token:
-        raise ValueError("Invalid token")
+        raise ModifiedDataException("Invalid token")
     version = sharable_token.split("\n")[0]
     user_id = sharable_token.split("\n")[1]
     address_id = sharable_token.split("\n")[2]
@@ -36,12 +42,15 @@ def decode_sharable_token(sharable_token, sign_token):
     custom_address_ids = sharable_token.split("\n")[4].split(" ")
     custom_places_ids = sharable_token.split("\n")[5].split(" ")
     timestamp = sharable_token.split("\n")[6]
+    def safe_convert_to_int(ids):
+        return list(map(lambda id_: int(id_), filter(lambda x: x != '', ids)))
+
     return {
         "user_id": int(user_id),
         "address_id": int(address_id),
-        "category_ids": list(map(lambda id_: int(id_), category_ids)),
-        "custom_address_ids": list(map(lambda id_: int(id_), custom_address_ids)),
-        "custom_places_ids": list(map(lambda id_: int(id_), custom_places_ids)),
+        "category_ids": safe_convert_to_int(category_ids),
+        "custom_address_ids": safe_convert_to_int(custom_address_ids),
+        "custom_places_ids": safe_convert_to_int(custom_places_ids),
         "timestamp": int(timestamp),
     }
     
@@ -138,7 +147,8 @@ async def generate_report_geojson(
 async def get_task_id_by_sharable_data(sharable_data, signature, user: User = Depends(current_user_optional)):
     try:
         data = decode_sharable_token(sharable_data, signature)
-    except ValueError:
+        
+    except ModifiedDataException:
         raise HTTPException(404, "Data was modified")
     user = await UserDAO.find_by_id(int(data["user_id"]))
     task_id = await generate_report_geojson(ReportCreate.validate(data), user)

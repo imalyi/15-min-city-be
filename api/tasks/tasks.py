@@ -22,7 +22,7 @@ def generate_sharable_token(user_id, request):
     custom_address_ids = " ".join(map(lambda id_:str(id_), request.get("custom_address_ids", [])))
     custom_places_ids = " ".join(map(lambda id_:str(id_), request.get("custom_places_ids", [])))
     # fist digit is version
-    result = f"1\n{user_id}\n{address_id}\n{categories_ids}\n{custom_address_ids}\n{custom_places_ids}\n{int(datetime.datetime.now().timestamp())}"
+    result = f"1\n{user_id}\n{address_id},{categories_ids}\n{custom_address_ids}\n{custom_places_ids}\n{int(datetime.datetime.now().timestamp())}"
     signature = hmac.new(config.JWT_SECRET.encode(), result.encode(), hashlib.sha256).digest()
 
     result_compressed = zlib.compress(result.encode("ascii"))
